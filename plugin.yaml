@@ -1,0 +1,42 @@
+schema: mcpg.dev/plugin/v1
+id: dev.mcpg.backend.clickhouse
+name: ClickHouse Binding
+license: Apache-2.0
+description: |
+  Runs an operator-fixed analytical SQL statement against a ClickHouse server
+  (OSS, Cloud, Altinity) over its HTTP interface and returns rows as JSON. The
+  statement uses `?` positional placeholders bound from `params` — an ordered
+  list of CEL expressions evaluated against the tool arguments. Values are
+  escaped + serialized by the driver as ClickHouse SQL literals (never raw
+  string-interpolated), so caller input cannot alter the statement
+  (injection-safe). A read-only keyword guard (SELECT / WITH / SHOW / DESCRIBE
+  / EXPLAIN) plus a server-side `readonly=1` setting fence the statement. Auth
+  is HTTP basic (username + password, the password resolved from `${cred://…}`
+  at config load). TLS is pure-Rust rustls (no native-tls / OpenSSL).
+
+  Beyond the default `operation: query`, a binding may instead perform read-only
+  schema discovery: `operation: list_tables` queries `system.tables` (database /
+  name / engine / total_rows / total_bytes) and `operation: list_columns`
+  queries `system.columns` (database / table / name / type / position /
+  default_kind). The optional database / table filters are passed as BOUND query
+  parameters (never string-interpolated). Catalog operations are inherently
+  read-only and ignore `statement` / `params`. Operator-fixed per-query
+  ClickHouse `query.settings` (e.g. `readonly`, `max_execution_time`,
+  `max_threads`, `max_memory_usage`) apply on every query as guardrails;
+  settings are operator-config only, never caller-supplied.
+
+  A second `watch_strategy` entity (kind `clickhouse_poll`) lets a resource
+  subscribe to ClickHouse changes by POLLING. Each watcher carries its own
+  connection (`url` / `database` / `auth` / `tls`) plus a read-only scalar
+  high-water `tracking_query` (e.g. `SELECT max(event_time) FROM events`). The
+  plugin runs that query every `interval_ms` (default 60000, floored at 250 ms)
+  with a per-tick `timeout_ms` budget (default 10000), and emits
+  `notifications/resources/updated` whenever the scalar advances past the
+  previously-seen value (the first tick only establishes the baseline, so a
+  watcher never fires spuriously at startup). The `tracking_query` is held to
+  the same read-only keyword guard as the backend statement; an empty or
+  non-read-only query, or `tls.verify_peer = false`, is rejected at watch start.
+class: backend
+runtime: native-cdylib-v1
+protocol_version: "1.0"
+required_capabilities: [network_outbound]

@@ -1,0 +1,60 @@
+[package]
+name = "mcpg-plugin-backend-clickhouse"
+version = "0.1.0-alpha.15"
+license = "Apache-2.0"
+edition = "2024"
+description = """
+ClickHouse columnar-OLAP backend binding plugin for mcpg. Runs an operator-fixed
+analytical SQL statement against a ClickHouse server (OSS, Cloud, Altinity) over
+its HTTP interface and returns rows as JSON. The statement uses `?` placeholders
+bound from `params` — an ordered list of CEL expressions evaluated against the
+tool arguments. Values are escaped + serialized by the driver as ClickHouse SQL
+literals (never raw string-interpolated), so caller input cannot alter the
+statement (injection-safe). A read-only keyword guard plus a server-side
+`readonly=1` setting fence the statement. Pure-Rust transport (hyper + rustls)
+— no native-tls / OpenSSL. Complements the `sql`, `duckdb`, `snowflake`,
+`bigquery` and `elasticsearch` backends.
+"""
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+cdylib-export = []
+static-firstparty = []
+# Gates the ClickHouse-server testcontainer end-to-end suite so plain
+# `cargo test` stays fast (the unit tests never touch the network). Run:
+# `cargo test -p mcpg-plugin-backend-clickhouse --features integration-tests \
+#   --test integration -- --test-threads 1`.
+integration-tests = []
+
+[dependencies]
+mcpg-plugin-protocol = { git = "https://github.com/mcpg-dev/mcpg-plugin-protocol", tag = "v0.1.0-beta.13", version = "=0.1.0-beta.13" }
+mcpg-plugin-sdk      = { git = "https://github.com/mcpg-dev/mcpg-plugin-sdk", tag = "v0.1.0-beta.13", version = "=0.1.0-beta.13", features = ["static-firstparty"] }
+mcpg-plugin-host     = { git = "https://github.com/mcpg-dev/mcpg-plugin-host", tag = "v0.1.0-beta.13", version = "=0.1.0-beta.13" }
+async-trait    = "0.1"
+base64         = "0.22"
+# CEL for computed query parameters (mirrors the sql/oracle/duckdb backends).
+cel            = "0.13"
+chrono         = { version = "0.4", features = ["clock"] }
+metrics        = "0.24"
+# Official ClickHouse driver (async, HTTP interface, hyper transport). `lz4`
+# is the crate default (response compression). `rustls-tls` selects the
+# aws-lc-rs provider + webpki roots — pure-Rust TLS, no native-tls / OpenSSL.
+# We do NOT enable the `native-tls` feature (BANNED). The `clickhouse-rs`
+# crate (a different package, native-tls) is NOT used.
+clickhouse     = { version = "0.13", default-features = false, features = ["lz4", "rustls-tls"] }
+serde          = { version = "1", features = ["derive"] }
+serde_json     = "1"
+tokio          = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "time"] }
+tracing        = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+async-trait = "0.1"
+# ClickHouse-server end-to-end integration fixtures (the bundled
+# `clickhouse/clickhouse-server` image, HTTP port 8123).
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["clickhouse"] }
+
