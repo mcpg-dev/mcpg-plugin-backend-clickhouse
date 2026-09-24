@@ -177,7 +177,7 @@ pub async fn run_query(
 }
 
 /// Like [`run_query`] but also applies operator-fixed query `settings` via the
-/// driver's `.with_option(k, v)`. The settings come from operator config only
+/// driver's `.with_setting(k, v)`. The settings come from operator config only
 /// (never caller args). They are applied AFTER the `max_execution_time`
 /// default, so an explicit operator entry (e.g. a tighter `max_execution_time`)
 /// overrides the default for that key.
@@ -198,7 +198,7 @@ pub async fn run_query_with_settings(
     // Server-side execution budget — at least 1s when a sub-second timeout is
     // configured, so ClickHouse does not see `max_execution_time=0` (unbounded).
     let secs = timeout.as_secs().max(1);
-    query = query.with_option("max_execution_time", secs.to_string());
+    query = query.with_setting("max_execution_time", secs.to_string());
     // A read profile's statement is keyword-guarded at register time and goes
     // out over HTTP GET, which ClickHouse already treats as read-only at the
     // server. Sending an explicit `readonly` setting on top of that is rejected
@@ -206,7 +206,7 @@ pub async fn run_query_with_settings(
     // read-only guard rides on the GET method rather than a settings override.
     // Operator-fixed settings last so they win over the defaults above.
     for (k, v) in settings {
-        query = query.with_option(k, v);
+        query = query.with_setting(k, v);
     }
 
     // A write profile statement (DDL / INSERT) returns no rows and must go out
