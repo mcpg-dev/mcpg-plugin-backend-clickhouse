@@ -267,9 +267,8 @@ cargo test -p mcpg-plugin-backend-clickhouse \
     --features integration-tests --test integration -- --test-threads 1
 ```
 
-(needs Docker; runs in the `--config=integration` CI lane — the bundled
-`clickhouse/clickhouse-server` image has no auth, exercising the plain HTTP
-path.)
+(needs Docker; the suite starts `clickhouse/clickhouse-server:23.3.8.21-alpine`,
+which has no auth, so it exercises the plain HTTP path.)
 
 ## Notes
 
